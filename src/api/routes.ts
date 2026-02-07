@@ -134,19 +134,26 @@ export function buildRoutes(state: ApiState) {
 
   api.post("/session/shutdown", async (c) => {
     if (state.initLock) {
-      return c.json({ error: "Session init in progress" }, 409);
+      return c.json({ error: "Session operation in progress" }, 409);
     }
+    state.initLock = true;
 
-    const ctrl = getController(state);
-    state.tracker.clear();
-    state.controller = null;
+    try {
+      const ctrl = getController(state);
+      const wasOwned = state.owned;
 
-    if (state.owned) {
-      await ctrl.shutdown();
+      state.tracker.clear();
+      state.controller = null;
+      state.owned = false;
+
+      if (wasOwned) {
+        await ctrl.shutdown();
+      }
+
+      return c.json({ ok: true });
+    } finally {
+      state.initLock = false;
     }
-
-    state.owned = false;
-    return c.json({ ok: true });
   });
 
   // ─── Actions ─────────────────────────────────────────────────────────
